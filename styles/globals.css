@@ -1,0 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body { background:#0b0b14; color:#e5e7eb; }
+.glass { @apply bg-white/5 border border-white/10 backdrop-blur; }
