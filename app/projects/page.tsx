@@ -146,23 +146,25 @@ const ALL_PROJECTS: Project[] = [
   },
 ];
 
-
-const CATEGORIES: { key: Project["category"] | "all"; label: string }[] = [
+// 1) 'as const' تا literal types حفظ شوند.
+const CATEGORIES = [
   { key: "all", label: "همه" },
   { key: "personal", label: "شخصی" },
   { key: "store", label: "فروشگاهی" },
   { key: "company", label: "شرکتی" },
   { key: "dashboard", label: "داشبورد" },
   { key: "landing", label: "لندینگ" },
-];
+] as const;
 
-const ALL_TAGS = Array.from(
-  new Set(ALL_PROJECTS.flatMap((p) => p.tags))
-).sort();
+// 2) نوع کلید را از CATEGORIES استخراج کن.
+type CategoryKey = (typeof CATEGORIES)[number]["key"];
+
+const ALL_TAGS = Array.from(new Set(ALL_PROJECTS.flatMap((p) => p.tags))).sort();
 
 export default function ProjectsPage() {
   const [q, setQ] = useState("");
-  const [cat, setCat] = useState<CATEGORIES[number]["key"]>("all");
+  // 3) اینجا از نوع استخراج‌شده استفاده می‌کنیم.
+  const [cat, setCat] = useState<CategoryKey>("all");
   const [activeTags, setActiveTags] = useState<string[]>([]);
 
   const filtered = useMemo(() => {
@@ -172,8 +174,8 @@ export default function ProjectsPage() {
         q.trim().length === 0
           ? true
           : [p.title, p.desc, p.year, p.tags.join(" ")].join(" ")
-            .toLowerCase()
-            .includes(q.toLowerCase());
+              .toLowerCase()
+              .includes(q.toLowerCase());
       const byTags =
         activeTags.length === 0
           ? true
@@ -228,10 +230,11 @@ export default function ProjectsPage() {
             <button
               key={key}
               onClick={() => setCat(key)}
-              className={`px-3 py-1 rounded-full border text-sm transition ${cat === key
+              className={`px-3 py-1 rounded-full border text-sm transition ${
+                cat === key
                   ? "bg-gradient-to-r from-fuchsia-500 to-cyan-400 text-white"
                   : "bg-white/5 border-white/10 hover:bg-white/10"
-                }`}
+              }`}
             >
               {label}
             </button>
@@ -249,10 +252,11 @@ export default function ProjectsPage() {
               <button
                 key={t}
                 onClick={() => toggleTag(t)}
-                className={`px-3 py-1 rounded-full border text-xs transition ${active
+                className={`px-3 py-1 rounded-full border text-xs transition ${
+                  active
                     ? "bg-cyan-500/20 border-cyan-400/60 text-cyan-200"
                     : "bg-white/5 border-white/10 hover:bg-white/10"
-                  }`}
+                }`}
               >
                 {t}
               </button>
@@ -313,10 +317,7 @@ export default function ProjectsPage() {
                 <span className="text-xs text-slate-400">
                   دسته:{" "}
                   <span className="text-slate-200">
-                    {
-                      CATEGORIES.find((c) => c.key === p.category)?.label ||
-                      p.category
-                    }
+                    {CATEGORIES.find((c) => c.key === p.category)?.label || p.category}
                   </span>
                 </span>
 
