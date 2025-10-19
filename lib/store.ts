@@ -1,65 +1,151 @@
+// lib/store.ts
 import { promises as fs } from "fs";
 import path from "path";
 
+type Order = {
+  id: string;
+  name: string;
+  phone: string;
+  budget?: string;
+  service: string;
+  details: string;
+  status: "new" | "reviewing" | "done";
+  createdAt: string;
+};
+
 type Contact = {
-  type: "contact";
+  id: string;
   name: string;
   email: string;
   message: string;
+  status: "new" | "reviewing" | "done";
   createdAt: string;
 };
 
-type Order = {
-  type: "order";
-  name: string;
-  budget?: string;
-  phone: string;
-  service: string;
-  details: string;
-  createdAt: string;
-};
+const useKV = !!process.env.KV_REST_API_URL; // روی Vercel true میشه
 
-type DB = { contacts: Contact[]; orders: Order[] };
-
-// انتخاب فایل ذخیره‌سازی به‌صورت Cross-platform
-const defaultFile =
-  process.env.NODE_ENV === "production"
-    ? path.join("/tmp", "submissions.json") // روی Vercel/لینوکس
-    : path.join(process.cwd(), ".data", "submissions.json"); // روی ویندوز/لوکال
-
-const FILE = process.env.STORE_FILE || defaultFile;
-
-async function ensureDirExists(filePath: string) {
-  const dir = path.dirname(filePath);
-  await fs.mkdir(dir, { recursive: true }).catch(() => {});
+// --- KV helpers
+let kv: any = null;
+if (useKV) {
+  // @vercel/kv داخل package.json اضافه شده
+  // "dependencies": { "@vercel/kv": "latest", ... }
+  // اگر نداری: npm i @vercel/kv
+  const mod = await import("@vercel/kv");
+  kv = mod.kv;
 }
 
-async function readDB(): Promise<DB> {
-  try {
-    const raw = await fs.readFile(FILE, "utf8");
-    return JSON.parse(raw) as DB;
-  } catch {
-    return { contacts: [], orders: [] };
+// --- File helpers (fallback برای dev)
+const DATA_DIR = path.join(process.cwd(), ".data");
+const ORDERS_FILE = path.join(DATA_DIR, "orders.json");
+const CONTACTS_FILE = path.join(DATA_DIR, "contacts.json");
+
+async function ensureFiles() {
+  await fs.mkdir(DATA_DIR, { recursive: true }).catch(() => {});
+  for (const f of [ORDERS_FILE, CONTACTS_FILE]) {
+    try { await fs.access(f); } catch { await fs.writeFile(f, "[]"); }
   }
 }
 
-async function writeDB(db: DB) {
-  await ensureDirExists(FILE);
-  await fs.writeFile(FILE, JSON.stringify(db, null, 2), "utf8");
+function id() {
+  // بدون crypto برای edge سازگاری
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-export async function addContact(c: Omit<Contact, "type" | "createdAt">) {
-  const db = await readDB();
-  db.contacts.unshift({ type: "contact", createdAt: new Date().toISOString(), ...c });
-  await writeDB(db);
+// ---------- Orders ----------
+export async function addOrder(input: Omit<Order, "id" | "createdAt" | "status">) {
+  const rec: Order = { id: id(), createdAt: new Date().toISOString(), status: "new", ...input };
+
+  if (useKV) {
+    // لیست «orders»
+    await kv.lpush("orders", JSON.stringify(rec));
+  } else {
+    await ensureFiles();
+    const buf = await fs.readFile(ORDERS_FILE, "utf8");
+    const all: Order[] = JSON.parse(buf || "[]");
+    all.unshift(rec);
+    await fs.writeFile(ORDERS_FILE, JSON.stringify(all, null, 2));
+  }
+  return rec;
 }
 
-export async function addOrder(o: Omit<Order, "type" | "createdAt">) {
-  const db = await readDB();
-  db.orders.unshift({ type: "order", createdAt: new Date().toISOString(), ...o });
-  await writeDB(db);
+export async function listOrders(): Promise<Order[]> {
+  if (useKV) {
+    const raw: string[] = await kv.lrange("orders", 0, -1);
+    return raw.map((s) => JSON.parse(s)).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  } else {
+    await ensureFiles();
+    const buf = await fs.readFile(ORDERS_FILE, "utf8");
+    return JSON.parse(buf || "[]");
+  }
 }
 
-export async function listAll() {
-  return readDB();
+export async function setOrderStatus(id: string, status: Order["status"]) {
+  if (useKV) {
+    const raw: string[] = await kv.lrange("orders", 0, -1);
+    const items = raw.map((s) => JSON.parse(s));
+    const idx = items.findIndex((x: Order) => x.id === id);
+    if (idx >= 0) {
+      items[idx].status = status;
+      // بازنویسی کل لیست
+      await kv.del("orders");
+      if (items.length) await kv.rpush("orders", ...items.map((x: Order) => JSON.stringify(x)));
+    }
+    return;
+  } else {
+    await ensureFiles();
+    const all: Order[] = JSON.parse(await fs.readFile(ORDERS_FILE, "utf8") || "[]");
+    const idx = all.findIndex((x) => x.id === id);
+    if (idx >= 0) {
+      all[idx].status = status;
+      await fs.writeFile(ORDERS_FILE, JSON.stringify(all, null, 2));
+    }
+  }
+}
+
+// ---------- Contacts ----------
+export async function addContact(input: Omit<Contact, "id" | "createdAt" | "status">) {
+  const rec: Contact = { id: id(), createdAt: new Date().toISOString(), status: "new", ...input };
+
+  if (useKV) {
+    await kv.lpush("contacts", JSON.stringify(rec));
+  } else {
+    await ensureFiles();
+    const all: Contact[] = JSON.parse(await fs.readFile(CONTACTS_FILE, "utf8") || "[]");
+    all.unshift(rec);
+    await fs.writeFile(CONTACTS_FILE, JSON.stringify(all, null, 2));
+  }
+  return rec;
+}
+
+export async function listContacts(): Promise<Contact[]> {
+  if (useKV) {
+    const raw: string[] = await kv.lrange("contacts", 0, -1);
+    return raw.map((s) => JSON.parse(s)).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  } else {
+    await ensureFiles();
+    const buf = await fs.readFile(CONTACTS_FILE, "utf8");
+    return JSON.parse(buf || "[]");
+  }
+}
+
+export async function setContactStatus(id: string, status: Contact["status"]) {
+  if (useKV) {
+    const raw: string[] = await kv.lrange("contacts", 0, -1);
+    const items = raw.map((s) => JSON.parse(s));
+    const idx = items.findIndex((x: Contact) => x.id === id);
+    if (idx >= 0) {
+      items[idx].status = status;
+      await kv.del("contacts");
+      if (items.length) await kv.rpush("contacts", ...items.map((x: Contact) => JSON.stringify(x)));
+    }
+    return;
+  } else {
+    await ensureFiles();
+    const all: Contact[] = JSON.parse(await fs.readFile(CONTACTS_FILE, "utf8") || "[]");
+    const idx = all.findIndex((x) => x.id === id);
+    if (idx >= 0) {
+      all[idx].status = status;
+      await fs.writeFile(CONTACTS_FILE, JSON.stringify(all, null, 2));
+    }
+  }
 }
