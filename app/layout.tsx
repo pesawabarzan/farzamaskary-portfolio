@@ -3,23 +3,55 @@ import "../styles/globals.css";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import ParticlesBackground from "@/components/ParticlesBackground";
+import Script from "next/script";
 
-export const metadata: Metadata = {
-  title: "Farzam Askary — Portfolio",
-  description: "Portfolio نئونی فرزام عسکری | طراح و توسعه‌دهنده‌ی وب از بوکان",
-  keywords: ["Farzam Askary", "Portfolio", "Web Designer", "Developer", "Iran", "نئون", "بوکان"],
+{/* ... داخل <html> */}
+<Script id="ld-person" type="application/ld+json">
+{JSON.stringify({
+  "@context":"https://schema.org",
+  "@type":"Person",
+  name:"فرزام عسکری",
+  jobTitle:"Front-end Developer",
+  url:"https://farzamaskary.ir",
+  sameAs:[
+    "https://github.com/FarzamAskary",
+    "https://www.linkedin.com/in/FarzamAskary"
+  ]
+})}
+</Script>
+
+export const metadata = {
   metadataBase: new URL("https://farzamaskary.ir"),
-  openGraph: {
-    title: "Farzam Askary — Portfolio",
-    description: "طراحی و توسعه وب با استایل نئونی و تجربه کاربری مدرن",
-    url: "https://farzamaskary.ir",
-    siteName: "Farzam Askary",
-    images: [{ url: "/og.png", width: 1200, height: 630 }],
-    locale: "fa_IR",
-    type: "website",
+  title: {
+    default: "فرزام عسکری | طراح و توسعه‌دهنده وب",
+    template: "%s — فرزام عسکری",
   },
-  icons: [{ rel: "icon", url: "/favicon.svg" }],
+  description:
+    "فرزام عسکری، طراح و توسعه‌دهنده وب. طراحی سایت حرفه‌ای: لندینگ، فروشگاهی، شرکتی، داشبورد. Next.js, React, Tailwind, SEO.",
+  keywords: [
+    "فرزام عسکری","فرزام","طراح سایت","توسعه دهنده وب","Next.js","React",
+    "طراحی سایت در تهران","ساخت فروشگاه اینترنتی","طراحی لندینگ","SEO"
+  ],
+  alternates: { canonical: "https://farzamaskary.ir" },
+  openGraph: {
+    type: "website",
+    url: "https://farzamaskary.ir",
+    title: "فرزام عسکری | طراح و توسعه‌دهنده وب",
+    description:
+      "طراحی وب‌سایت‌های سریع و مدرن با Next.js — فروشگاهی، شرکتی، شخصی و داشبورد.",
+    images: [{ url: "/og.jpg", width: 1200, height: 630 }],
+    locale: "fa_IR",
+    siteName: "Farzam Askary",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "فرزام عسکری | طراح و توسعه‌دهنده وب",
+    description:
+      "طراحی وب‌سایت‌های سریع و مدرن با Next.js — فروشگاهی، شرکتی، شخصی و داشبورد.",
+    images: ["/og.jpg"],
+  },
 };
+
 
 export default function RootLayout({
   children,
@@ -28,10 +60,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fa" dir="rtl">
+
       <body className="min-h-screen antialiased bg-[#0b0b14] text-slate-100 relative overflow-x-hidden">
         {/* 🔮 بک‌گراند نئونی + ذرات */}
-        <ParticlesBackground />
-
+        <div>
+          <ParticlesBackground />
+        </div>
         {/* نئون گرادیانت ثابت در بک */}
         <div className="fixed inset-0 -z-10 overflow-hidden">
           <div className="absolute -top-24 -left-16 h-96 w-96 rounded-full blur-3xl bg-fuchsia-600/20" />

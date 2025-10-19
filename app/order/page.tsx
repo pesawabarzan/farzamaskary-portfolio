@@ -1,11 +1,40 @@
 "use client";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { CheckCircle, Zap, Rocket } from "lucide-react";
 import NeonCard from "@/components/NeonCard";
 import ParticlesBackground from "@/components/ParticlesBackground";
 
-
 export default function OrderPage() {
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setMsg(null);
+    setLoading(true);
+
+    const form = e.currentTarget; // ✅ فرم را قبل از await نگه‌دار
+    const fd = new FormData(form);
+
+    try {
+      const res = await fetch("/api/order", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({} as any));
+
+      if (res.ok && (data as any)?.ok) {
+        setMsg("سفارش با موفقیت ثبت شد ✅");
+        form.reset(); // ✅ امن
+      } else {
+        setMsg((data as any)?.error || `ثبت سفارش ناموفق بود. دوباره تلاش کنید.`);
+      }
+    } catch (err) {
+      console.error(err);
+      setMsg("ثبت سفارش ناموفق بود. دوباره تلاش کنید.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="space-y-16">
       {/* Header */}
@@ -40,26 +69,60 @@ export default function OrderPage() {
       {/* Form */}
       <section>
         <NeonCard>
-          <h2 className="text-2xl font-bold mb-4 text-cyan-300 text-center">
-            فرم ثبت سفارش
-          </h2>
-          <form
-            onSubmit={(e) => e.preventDefault()}
-            className="grid grid-cols-1 md:grid-cols-2 gap-4"
-          >
-            <input placeholder="نام کامل" className="p-3 rounded-xl bg-black/40 border border-white/10 focus:ring-2 focus:ring-fuchsia-500" />
-            <input placeholder="ایمیل" className="p-3 rounded-xl bg-black/40 border border-white/10 focus:ring-2 focus:ring-fuchsia-500" />
-            <input placeholder="شماره تماس" className="p-3 rounded-xl bg-black/40 border border-white/10 focus:ring-2 focus:ring-fuchsia-500" />
-            <select className="p-3 rounded-xl bg-black/40 border border-white/10 focus:ring-2 focus:ring-cyan-500">
-              <option>نوع پروژه</option>
-              <option>سایت شخصی</option>
-              <option>فروشگاه</option>
-              <option>شرکتی</option>
+          <h2 className="text-2xl font-bold mb-4 text-cyan-300 text-center">فرم ثبت سفارش</h2>
+
+          <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              name="name"
+              placeholder="نام کامل"
+              required
+              className="p-3 rounded-xl bg-black/40 border border-white/10 focus:ring-2 focus:ring-fuchsia-500"
+            />
+            <input
+              name="budget"
+              placeholder="بودجه (اختیاری)"
+              className="p-3 rounded-xl bg-black/40 border border-white/10 focus:ring-2 focus:ring-fuchsia-500"
+            />
+            <input
+              name="phone"
+              placeholder="شماره تماس"
+              required
+              className="p-3 rounded-xl bg-black/40 border border-white/10 focus:ring-2 focus:ring-fuchsia-500"
+            />
+            <select
+              name="service"
+              required
+              className="p-3 rounded-xl bg-black/40 border border-white/10 focus:ring-2 focus:ring-cyan-500"
+              defaultValue=""
+            >
+              <option value="" disabled>نوع پروژه</option>
+              <option value="personal">سایت شخصی</option>
+              <option value="store">فروشگاهی</option>
+              <option value="company">شرکتی</option>
+              <option value="landing">لندینگ</option>
+              <option value="dashboard">داشبورد</option>
             </select>
-            <textarea placeholder="توضیحات پروژه" className="md:col-span-2 h-32 p-3 rounded-xl bg-black/40 border border-white/10 focus:ring-2 focus:ring-fuchsia-500"></textarea>
-            <button className="md:col-span-2 mt-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 font-semibold hover:opacity-90 transition">
-              ارسال سفارش
+
+            <textarea
+              name="details"
+              placeholder="توضیحات پروژه"
+              required
+              className="md:col-span-2 h-32 p-3 rounded-xl bg-black/40 border border-white/10 focus:ring-2 focus:ring-fuchsia-500"
+            />
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="md:col-span-2 mt-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 font-semibold hover:opacity-90 transition disabled:opacity-60"
+            >
+              {loading ? "در حال ارسال..." : "ارسال سفارش"}
             </button>
+
+            {msg && (
+              <p className="md:col-span-2 text-sm text-slate-200" aria-live="polite">
+                {msg}
+              </p>
+            )}
           </form>
         </NeonCard>
       </section>
@@ -80,9 +143,8 @@ export default function OrderPage() {
           ))}
         </div>
       </section>
-      <div>
-        <ParticlesBackground/>
-      </div>
+
+      <ParticlesBackground />
     </div>
   );
 }

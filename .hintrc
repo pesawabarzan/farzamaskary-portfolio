@@ -6,6 +6,7 @@
     "disown-opener": "off",
     "axe/name-role-value": "off",
     "axe/forms": "off",
-    "button-type": "off"
+    "button-type": "off",
+    "no-inline-styles": "off"
   }
 }

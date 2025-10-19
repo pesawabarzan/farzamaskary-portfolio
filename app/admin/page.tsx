@@ -1,64 +1,120 @@
+"use client";
+import { useEffect, useState } from "react";
 import ParticlesBackground from "@/components/ParticlesBackground";
 
-"use client";
-import { useMemo, useState } from "react";
-import NeonCard from "@/components/NeonCard";
+type Order = {
+  id: string; name: string; phone: string; budget?: string;
+  service: string; details: string; createdAt: string;
+  status: "new" | "review" | "done";
+};
+type Msg = {
+  id: string; name: string; email: string; message: string;
+  createdAt: string; status: "new" | "review" | "done";
+};
 
-type Order = { id:string; name:string; email:string; type:string; status:"جدید"|"در حال بررسی"|"تکمیل شده"; date:string };
+export default function AdminPage() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [loading, setLoading] = useState(true);
 
-const seed: Order[] = [
-  { id:"ORD-1001", name:"Ali M", email:"ali@example.com", type:"فروشگاه", status:"جدید", date:"2025-10-01" },
-  { id:"ORD-1002", name:"Sara K", email:"sara@example.com", type:"سایت شخصی", status:"در حال بررسی", date:"2025-10-05" },
-  { id:"ORD-1003", name:"Reza P", email:"reza@example.com", type:"شرکتی", status:"تکمیل شده", date:"2025-10-10" },
-];
+  async function refresh() {
+    setLoading(true);
+    const [o, m] = await Promise.all([
+      fetch("/api/order").then(r=>r.json()),
+      fetch("/api/contact").then(r=>r.json())
+    ]);
+    setOrders(o); setMsgs(m); setLoading(false);
+  }
+  useEffect(() => { refresh(); }, []);
 
-export default function AdminPage(){
-  const [orders, setOrders] = useState<Order[]>(seed);
-  const [q,setQ] = useState("");
+  async function setStatus(kind: "order"|"msg", id: string, status: "review"|"done") {
+    await fetch(kind==="order" ? "/api/order" : "/api/contact", {
+      method:"PATCH", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ id, status }),
+    });
+    refresh();
+  }
+  async function remove(kind: "order"|"msg", id: string) {
+    await fetch((kind==="order"?"/api/order":"/api/contact")+`?id=${id}`, { method:"DELETE" });
+    refresh();
+  }
 
-  const filtered = useMemo(()=>orders.filter(o =>
-    o.id.includes(q) || o.name.includes(q) || o.email.includes(q) || o.type.includes(q) || o.status.includes(q)
-  ),[orders,q]);
-
-  const updateStatus = (id:string, status:Order["status"]) => {
-    setOrders(prev => prev.map(o => o.id===id? {...o, status}: o));
-  };
+  const statusChip = (s: Order["status"]) => ({
+    new: "bg-yellow-500/20 text-yellow-300",
+    review: "bg-blue-500/20 text-blue-300",
+    done: "bg-emerald-500/20 text-emerald-300",
+  }[s]);
 
   return (
-    <div>
-      <h2 className="text-2xl font-bold">پنل ادمین</h2>
-      <p className="text-slate-400 mt-1 text-sm">نسخه‌ی نمایشی – بدون بک‌اند. مدیریت سفارش‌ها با دادهٔ نمونه.</p>
+    <div className="relative">
+      <ParticlesBackground /> {/* بک‌گراند متحرک */}
 
-      <NeonCard className="mt-6">
-        <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-          <input placeholder="جستجو بر اساس نام/ایمیل/شناسه..." value={q} onChange={e=>setQ(e.target.value)} className="p-3 rounded-xl glass placeholder:text-slate-400 w-full md:w-80"/>
-          <div className="text-sm text-slate-400">کل: {filtered.length}</div>
-        </div>
-        <div className="mt-4 overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="text-slate-400">
-              <tr className="text-left"><th className="py-2">شناسه</th><th>نام</th><th>ایمیل</th><th>نوع</th><th>وضعیت</th><th>تاریخ</th><th>اقدام</th></tr>
-            </thead>
-            <tbody>
-              {filtered.map(o => (
-                <tr key={o.id} className="border-t border-white/10">
-                  <td className="py-2">{o.id}</td>
-                  <td>{o.name}</td>
-                  <td>{o.email}</td>
-                  <td>{o.type}</td>
-                  <td>{o.status}</td>
-                  <td>{o.date}</td>
-                  <td className="space-x-2 rtl:space-x-reverse">
-                    <button onClick={()=>updateStatus(o.id,"جدید")} className="px-3 py-1 rounded-lg glass">جدید</button>
-                    <button onClick={()=>updateStatus(o.id,"در حال بررسی")} className="px-3 py-1 rounded-lg glass">در حال بررسی</button>
-                    <button onClick={()=>updateStatus(o.id,"تکمیل شده")} className="px-3 py-1 rounded-lg glass">تکمیل</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </NeonCard>
+      <div className="relative z-10 max-w-6xl mx-auto p-6 space-y-10">
+        <header className="flex items-center justify-between">
+          <h1 className="text-3xl font-extrabold">داشبورد ادمین</h1>
+          <button onClick={refresh} className="px-3 py-1 rounded-lg bg-white/10 border border-white/10">بروزرسانی</button>
+        </header>
+
+        {loading ? <p>در حال بارگذاری…</p> : (
+          <>
+            {/* Orders */}
+            <section>
+              <h2 className="text-2xl font-bold mb-4">سفارش‌ها ({orders.length})</h2>
+              <div className="space-y-3">
+                {orders.map(o => (
+                  <div key={o.id} className="p-4 rounded-xl bg-white/5 border border-white/10">
+                    <div className="flex flex-wrap items-center gap-2 justify-between">
+                      <div className="space-y-1">
+                        <div className="text-slate-200">{o.name} — {o.phone}</div>
+                        <div className="text-sm text-slate-400">
+                          نوع: {o.service} {o.budget ? `— بودجه: ${o.budget}` : ""} — {new Date(o.createdAt).toLocaleString()}
+                        </div>
+                        <div className="text-sm text-slate-300">{o.details}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${statusChip(o.status)}`}>
+                          {o.status === "new" ? "جدید" : o.status === "review" ? "درحال بررسی" : "تکمیل‌شده"}
+                        </span>
+                        <button onClick={()=>setStatus("order", o.id, "review")} className="px-2 py-1 text-xs rounded bg-blue-500/20 border border-blue-500/30">بررسی</button>
+                        <button onClick={()=>setStatus("order", o.id, "done")} className="px-2 py-1 text-xs rounded bg-emerald-500/20 border border-emerald-500/30">تکمیل شد</button>
+                        <button onClick={()=>remove("order", o.id)} className="px-2 py-1 text-xs rounded bg-red-500/20 border border-red-500/30">حذف</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {orders.length===0 && <p className="text-slate-400">سفارشی موجود نیست.</p>}
+              </div>
+            </section>
+
+            {/* Messages */}
+            <section>
+              <h2 className="text-2xl font-bold mb-4 mt-10">پیام‌ها ({msgs.length})</h2>
+              <div className="space-y-3">
+                {msgs.map(m => (
+                  <div key={m.id} className="p-4 rounded-xl bg-white/5 border border-white/10">
+                    <div className="flex flex-wrap items-center gap-2 justify-between">
+                      <div className="space-y-1">
+                        <div className="text-slate-200">{m.name} — {m.email}</div>
+                        <div className="text-sm text-slate-400">{new Date(m.createdAt).toLocaleString()}</div>
+                        <div className="text-sm text-slate-300">{m.message}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${statusChip(m.status)}`}>
+                          {m.status === "new" ? "جدید" : m.status === "review" ? "درحال بررسی" : "تکمیل‌شده"}
+                        </span>
+                        <button onClick={()=>setStatus("msg", m.id, "review")} className="px-2 py-1 text-xs rounded bg-blue-500/20 border border-blue-500/30">بررسی</button>
+                        <button onClick={()=>setStatus("msg", m.id, "done")} className="px-2 py-1 text-xs rounded bg-emerald-500/20 border border-emerald-500/30">تکمیل شد</button>
+                        <button onClick={()=>remove("msg", m.id)} className="px-2 py-1 text-xs rounded bg-red-500/20 border border-red-500/30">حذف</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {msgs.length===0 && <p className="text-slate-400">پیامی موجود نیست.</p>}
+              </div>
+            </section>
+          </>
+        )}
+      </div>
     </div>
-  )
+  );
 }
